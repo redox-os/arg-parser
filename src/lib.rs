@@ -246,7 +246,7 @@ impl ArgParser {
                         _ => self.invalid.push(Param::Long(arg.to_owned())),
                     }
                 }
-            } else if arg.starts_with("-") {
+            } else if arg.starts_with("-") && arg != "-" {
                 let mut chars = arg[1..].chars();
                 while let Some(ch) = chars.next() {
                     match self.params.get_mut(&ch) {

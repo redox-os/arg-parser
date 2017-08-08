@@ -68,26 +68,26 @@ enum Value {
     /// The RHS String value is shared between both short and long parameters
     Opt {
         rhs: Rhs<Rc<RefCell<String>>>,
-        found: bool,
+        found: Rc<RefCell<bool>>
     },
     Setting {
         rhs: Rhs<Rc<RefCell<String>>>,
-        found: bool,
+        found: Rc<RefCell<bool>>
     },
 }
 
 impl Value {
-    fn new_opt(value: Rc<RefCell<String>>) -> Self {
+    fn new_opt(value: Rc<RefCell<String>>, found: Rc<RefCell<bool>>) -> Self {
         Value::Opt {
             rhs: Rhs::new(value),
-            found: false,
+            found,
         }
     }
 
-    fn new_setting(value: Rc<RefCell<String>>) -> Self {
+    fn new_setting(value: Rc<RefCell<String>>, found: Rc<RefCell<bool>>) -> Self {
         Value::Setting {
             rhs: Rhs::new(value),
-            found: false,
+            found,
         }
     }
 }
@@ -155,22 +155,24 @@ impl ArgParser {
     ///   `-- The command to list files.
     pub fn add_opt(mut self, short: &str, long: &str) -> Self {
         let value = Rc::new(RefCell::new("".to_owned()));
+        let found = Rc::new(RefCell::new(false));
         if let Some(short) = short.chars().next() {
-            self.params.insert(Param::Short(short), Value::new_opt(value.clone()));
+            self.params.insert(Param::Short(short), Value::new_opt(value.clone(), found.clone()));
         }
         if !long.is_empty() {
-            self.params.insert(Param::Long(long.to_owned()), Value::new_opt(value));
+            self.params.insert(Param::Long(long.to_owned()), Value::new_opt(value, found));
         }
         self
     }
 
     pub fn add_opt_default(mut self, short: &str, long: &str, default: &str) -> Self {
         let value = Rc::new(RefCell::new(default.to_owned()));
+        let found = Rc::new(RefCell::new(false));
         if let Some(short) = short.chars().next() {
-            self.params.insert(Param::Short(short), Value::new_opt(value.clone()));
+            self.params.insert(Param::Short(short), Value::new_opt(value.clone(), found.clone()));
         }
         if !long.is_empty() {
-            self.params.insert(Param::Long(long.to_owned()), Value::new_opt(value));
+            self.params.insert(Param::Long(long.to_owned()), Value::new_opt(value, found));
         }
         self
     }
@@ -189,16 +191,18 @@ impl ArgParser {
     ///   `-- The command to list files.
     pub fn add_setting(mut self, setting: &str) -> Self {
         let value = Rc::new(RefCell::new("".to_owned()));
+        let found = Rc::new(RefCell::new(false));
         if !setting.is_empty() {
-            self.params.insert(Param::Long(setting.to_owned()), Value::new_setting(value));
+            self.params.insert(Param::Long(setting.to_owned()), Value::new_setting(value, found));
         }
         self
     }
 
     pub fn add_setting_default(mut self, setting: &str, default: &str) -> Self {
         let value = Rc::new(RefCell::new(default.to_owned()));
+        let found = Rc::new(RefCell::new(false));
         if !setting.is_empty() {
-            self.params.insert(Param::Long(setting.to_owned()), Value::new_setting(value));
+            self.params.insert(Param::Long(setting.to_owned()), Value::new_setting(value, found));
         }
         self
     }
@@ -229,7 +233,7 @@ impl ArgParser {
                             }
                             (*opt_rhs.value).borrow_mut().clear();
                             (*opt_rhs.value).borrow_mut().push_str(rhs);
-                            *found = true;
+                            *(*found).borrow_mut() = true;
                         }
                         _ => self.invalid.push(Param::Long(lhs.to_owned())),
                     }
@@ -241,7 +245,7 @@ impl ArgParser {
                         }
                         Some(&mut Value::Opt { ref mut rhs, ref mut found }) => {
                             rhs.occurrences += 1;
-                            *found = true;
+                            *(*found).borrow_mut() = true;
                         }
                         _ => self.invalid.push(Param::Long(arg.to_owned())),
                     }
@@ -258,11 +262,11 @@ impl ArgParser {
                             let rest: String = chars.collect();
                             if !rest.is_empty() {
                                 *(*rhs.value).borrow_mut() = rest;
-                                *found = true;
+                                *(*found).borrow_mut() = true;
                             } else {
                                 *(*rhs.value).borrow_mut() = args.next()
                                     .map(|a| {
-                                             *found = true;
+                                             *(*found).borrow_mut() = true;
                                              a
                                          })
                                     .unwrap_or("".to_owned());
@@ -291,7 +295,7 @@ impl ArgParser {
                             }
                             (*opt_rhs.value).borrow_mut().clear();
                             (*opt_rhs.value).borrow_mut().push_str(rhs);
-                            *found = true;
+                            *(*found).borrow_mut() = true;
                         }
                         _ => self.invalid.push(Param::Long(lhs.to_owned())),
                     }
@@ -319,8 +323,8 @@ impl ArgParser {
     {
         match self.params.get(name) {
             Some(&Value::Flag(ref rhs)) => *(*rhs.value).borrow_mut(),
-            Some(&Value::Opt { found, .. }) => found,
-            Some(&Value::Setting { found, .. }) => found,
+            Some(&Value::Opt { ref found, .. }) => *(**found).borrow(),
+            Some(&Value::Setting { ref found, .. }) => *(**found).borrow(),
             _ => false,
         }
     }
@@ -352,8 +356,10 @@ impl ArgParser {
     pub fn get_opt<O: Hash + Eq + ?Sized>(&self, opt: &O) -> Option<String>
         where Param: Borrow<O>
     {
-        if let Some(&Value::Opt { ref rhs, found: true }) = self.params.get(opt) {
-            return Some((*rhs.value).borrow().clone());
+        if let Some(&Value::Opt { ref rhs, ref found }) = self.params.get(opt) {
+            if *(**found).borrow() {
+                return Some((*rhs.value).borrow().clone());
+            }
         }
         None
     }
@@ -363,8 +369,10 @@ impl ArgParser {
     pub fn get_setting<O: Hash + Eq + ?Sized>(&self, setting: &O) -> Option<String>
         where Param: Borrow<O>
     {
-        if let Some(&Value::Setting { ref rhs, .. }) = self.params.get(setting) {
-            return Some((*rhs.value).borrow().clone());
+        if let Some(&Value::Setting { ref rhs, ref found }) = self.params.get(setting) {
+            if *(**found).borrow() {
+                return Some((*rhs.value).borrow().clone());
+            }
         }
         None
     }

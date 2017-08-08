@@ -352,7 +352,7 @@ impl ArgParser {
     pub fn get_opt<O: Hash + Eq + ?Sized>(&self, opt: &O) -> Option<String>
         where Param: Borrow<O>
     {
-        if let Some(&Value::Opt { ref rhs, .. }) = self.params.get(opt) {
+        if let Some(&Value::Opt { ref rhs, found: true }) = self.params.get(opt) {
             return Some((*rhs.value).borrow().clone());
         }
         None

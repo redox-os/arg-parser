@@ -167,7 +167,7 @@ impl ArgParser {
 
     pub fn add_opt_default(mut self, short: &str, long: &str, default: &str) -> Self {
         let value = Rc::new(RefCell::new(default.to_owned()));
-        let found = Rc::new(RefCell::new(false));
+        let found = Rc::new(RefCell::new(true));
         if let Some(short) = short.chars().next() {
             self.params.insert(Param::Short(short), Value::new_opt(value.clone(), found.clone()));
         }
@@ -200,7 +200,7 @@ impl ArgParser {
 
     pub fn add_setting_default(mut self, setting: &str, default: &str) -> Self {
         let value = Rc::new(RefCell::new(default.to_owned()));
-        let found = Rc::new(RefCell::new(false));
+        let found = Rc::new(RefCell::new(true));
         if !setting.is_empty() {
             self.params.insert(Param::Long(setting.to_owned()), Value::new_setting(value, found));
         }
@@ -488,11 +488,13 @@ mod tests {
         parser = parser.add_flag(&["a"])
             .add_flag(&["d"])
             .add_opt("s", "")
+            .add_opt_default("w", "", "default")
             .add_opt("f", "");
         parser.parse(args.into_iter());
         assert!(parser.found(&'a'));
         assert!(!parser.found(&'d'));
         assert!(parser.get_opt(&'s') == Some(String::from("df")));
+        assert!(parser.get_opt(&'w') == Some(String::from("default")));
         assert!(parser.get_opt(&'f') == Some(String::from("foo")));
     }
 
@@ -501,8 +503,10 @@ mod tests {
         let args = vec![String::from("binname"), String::from("--foo=bar")];
         let mut parser = ArgParser::new(4);
         parser = parser.add_opt("", "foo");
+        parser = parser.add_opt_default("", "def", "default");
         parser.parse(args.into_iter());
         assert!(parser.get_opt("foo") == Some(String::from("bar")));
+        assert!(parser.get_opt("def") == Some(String::from("default")));
     }
 
     #[test]

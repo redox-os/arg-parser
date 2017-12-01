@@ -106,6 +106,7 @@ impl ArgParser {
     ///
     /// The capacity specifies the initial capacity of the number parameters.
     /// Always good to set it at the number of flags and opts total.
+    /// (Used for initial hashmap allocation size)
     pub fn new(capacity: usize) -> Self {
         ArgParser {
             params: HashMap::with_capacity(capacity),
@@ -120,13 +121,15 @@ impl ArgParser {
     /// Flags are just parameters that have no assigned values. They are used
     /// for when certain features or options have been enabled for the application
     ///
-    /// For example
+    /// # Examples
+    /// ```text
     /// > ls -l --human-readable
     ///   ^  ^  ^
     ///   |  |  |
     ///   |  |  `-- A long flag to enable human readable numbers.
     ///   |  `-- A short flag to enable the long format.
     ///   `-- The command to list files.
+    /// ```
     pub fn add_flag(mut self, flags: &[&str]) -> Self {
         let value = Rc::new(RefCell::new(bool::default()));
         for flag in flags.iter() {
@@ -146,13 +149,15 @@ impl ArgParser {
     /// Opts are parameters that hold assigned values. They are used
     /// for when certain features or options have been enabled for the application
     ///
-    /// For example
+    /// # Examples
+    /// ```text
     /// > ls -T 4 --color=always
     ///   ^  ^    ^
     ///   |  |    |
     ///   |  |    `-- A long opt to enable the use of color with value `always`.
     ///   |  `-- A short opt to set tab size to the value `4`.
     ///   `-- The command to list files.
+    /// ```
     pub fn add_opt(mut self, short: &str, long: &str) -> Self {
         let value = Rc::new(RefCell::new("".to_owned()));
         let found = Rc::new(RefCell::new(false));
@@ -164,7 +169,8 @@ impl ArgParser {
         }
         self
     }
-
+    
+    /// Add an opt with a default value. Works the same way as [add_opt](struct.ArgParser.html#method.add_opt).
     pub fn add_opt_default(mut self, short: &str, long: &str, default: &str) -> Self {
         let value = Rc::new(RefCell::new(default.to_owned()));
         let found = Rc::new(RefCell::new(true));
@@ -182,13 +188,15 @@ impl ArgParser {
     /// Settings are parameters that hold assigned values. They are used
     /// in some applications such as dd
     ///
-    /// For example
+    /// # Examples
+    /// ```text
     /// > dd if=/path/file
     ///   ^  ^
     ///   |  |
     ///   |  |
     ///   |  `-- The setting set to /path/file
     ///   `-- The command to list files.
+    /// ```
     pub fn add_setting(mut self, setting: &str) -> Self {
         let value = Rc::new(RefCell::new("".to_owned()));
         let found = Rc::new(RefCell::new(false));
@@ -198,6 +206,7 @@ impl ArgParser {
         self
     }
 
+    /// Add a setting with a default value. Works the same way as [add_setting](struct.ArgParser.html#method.add_setting)
     pub fn add_setting_default(mut self, setting: &str, default: &str) -> Self {
         let value = Rc::new(RefCell::new(default.to_owned()));
         let found = Rc::new(RefCell::new(true));
@@ -318,6 +327,16 @@ impl ArgParser {
     }
 
     /// Check if a flag or opt has been found after initialization.
+    /// While the short form of the opt or flag will be recognized,
+    /// the long form should be used to enhance code readability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// if parser.found("my-long-flag") {
+    ///     //Do things...
+    /// }
+    /// ```
     pub fn found<P: Hash + Eq + ?Sized>(&self, name: &P) -> bool
         where Param: Borrow<P>
     {
@@ -417,7 +436,7 @@ impl ArgParser {
 pub fn format_system_time(time: SystemTime) -> String {
     let tz_offset = 0; //TODO Apply timezone offset
     match time.duration_since(UNIX_EPOCH) {
-        Ok(duration) => format_time(duration.as_secs() as i64, tz_offset), 
+        Ok(duration) => format_time(duration.as_secs() as i64, tz_offset),
         Err(_) => "duration since epoch err".to_string(),
     }
 }
